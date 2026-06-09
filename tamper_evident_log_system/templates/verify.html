@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}验证证明 - 防篡改审计日志系统{% endblock %}
+
+{% block content %}
+    <!-- 包含证明验证 -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">✅ 包含证明验证</h2>
+        </div>
+        
+        <form id="inclusion-form">
+            <div class="form-group">
+                <label class="form-label">日志索引</label>
+                <input type="number" class="form-control" id="inclusion-index" min="0" placeholder="请输入要验证的日志索引" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">验证包含证明</button>
+        </form>
+    </div>
+
+    <!-- 一致性证明验证 -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">🔗 一致性证明验证</h2>
+            <span class="badge badge-info">当前树大小: {{ tree_size }}</span>
+        </div>
+        
+        <form id="consistency-form">
+            <div class="form-group">
+                <label class="form-label">旧树大小</label>
+                <input type="number" class="form-control" id="old-size" min="0" max="{{ tree_size - 1 }}" placeholder="请输入旧树大小" required>
+            </div>
+            
+            <button type="submit" class="btn btn-secondary">验证一致性证明</button>
+        </form>
+    </div>
+
+    <!-- 验证结果 -->
+    <div id="result" style="display: none;">
+        <div class="card" id="result-card">
+            <div id="result-content"></div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        // 包含证明验证
+        document.getElementById('inclusion-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const index = parseInt(document.getElementById('inclusion-index').value);
+            if (isNaN(index)) return;
+            
+            showResult('card', '<div class="loader"></div>');
+            
+            try {
+                const response = await fetchJSON('/api/proof/verify/inclusion', {
+                    method: 'POST',
+                    body: JSON.stringify({ index })
+                });
+                
+                if (response.success) {
+                    const cardClass = response.is_valid ? 'card alert alert-success' : 'card alert alert-danger';
+                    const icon = response.is_valid ? '✅' : '❌';
+                    showResult(cardClass, `
+                        <h3>${icon} 包含证明验证</h3>
+                        <p><strong>日志索引:</strong> ${response.index}</p>
+                        <p><strong>验证结果:</strong> ${response.message}</p>
+                    `);
+                } else {
+                    showResult('card alert alert-danger', `<p>❌ ${response.message}</p>`);
+                }
+            } catch (error) {
+                showResult('card alert alert-danger', `<p>❌ 验证失败: ${error.message}</p>`);
+            }
+        });
+        
+        // 一致性证明验证
+        document.getElementById('consistency-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const oldSize = parseInt(document.getElementById('old-size').value);
+            if (isNaN(oldSize)) return;
+            
+            showResult('card', '<div class="loader"></div>');
+            
+            try {
+                const response = await fetchJSON('/api/proof/consistency', {
+                    method: 'POST',
+                    body: JSON.stringify({ old_size: oldSize })
+                });
+                
+                if (response.success) {
+                    const cardClass = response.is_valid ? 'card alert alert-success' : 'card alert alert-danger';
+                    const icon = response.is_valid ? '✅' : '❌';
+                    showResult(cardClass, `
+                        <h3>${icon} 一致性证明验证</h3>
+                        <p><strong>旧树大小:</strong> ${response.old_size}</p>
+                        <p><strong>新树大小:</strong> ${response.new_size}</p>
+                        <p><strong>证明哈希数:</strong> ${response.proof_hashes_count}</p>
+                        <p><strong>验证结果:</strong> ${response.message}</p>
+                    `);
+                } else {
+                    showResult('card alert alert-danger', `<p>❌ ${response.message}</p>`);
+                }
+            } catch (error) {
+                showResult('card alert alert-danger', `<p>❌ 验证失败: ${error.message}</p>`);
+            }
+        });
+        
+        function showResult(cardClass, content) {
+            const resultDiv = document.getElementById('result');
+            const resultCard = document.getElementById('result-card');
+            const resultContent = document.getElementById('result-content');
+            
+            resultCard.className = cardClass;
+            resultContent.innerHTML = content;
+            resultDiv.style.display = 'block';
+        }
+    </script>
+{% endblock %}
